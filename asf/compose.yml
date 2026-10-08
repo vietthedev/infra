@@ -1,6 +1,6 @@
 services:
   asf:
-    image: asf
+    image: justarchi/archisteamfarm
     container_name: asf
 
     user: "${PUID}:${PGID}"
@@ -14,8 +14,8 @@ services:
       - "[::1]:1242:1242"
 
     volumes:
-      - ./config:/app/config
-      - ./logs:/app/logs
+      - ${HOME}/config:/app/config
+      - ${HOME}/logs:/app/logs
 
     networks:
       - proxy
