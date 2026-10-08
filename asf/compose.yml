@@ -6,6 +6,7 @@ services:
     restart: unless-stopped
 
     environment:
+      ASF_CRYPTKEY=${ASF_CRYPTKEY:?required}
       ASF_UID: "1001"
       DOTNET_BUNDLE_EXTRACT_BASE_DIR: /tmp
 
