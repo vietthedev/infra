@@ -6,9 +6,9 @@ services:
     restart: unless-stopped
 
     environment:
-      - ASF_CRYPTKEY: "${ASF_CRYPTKEY:?required}"
-      - ASF_UID: "1001"
-      - DOTNET_BUNDLE_EXTRACT_BASE_DIR: /tmp
+      ASF_CRYPTKEY: "${ASF_CRYPTKEY:?required}"
+      ASF_UID: "1001"
+      DOTNET_BUNDLE_EXTRACT_BASE_DIR: /tmp
 
     ports:
       - "127.0.0.1:1242:1242"
