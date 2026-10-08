@@ -7,6 +7,7 @@ services:
     restart: unless-stopped
 
     environment:
+      ASF_UID: "1000"
       DOTNET_BUNDLE_EXTRACT_BASE_DIR: /tmp
 
     ports:
@@ -19,3 +20,7 @@ services:
 
     networks:
       - proxy
+
+networks:
+  proxy:
+    external: true
