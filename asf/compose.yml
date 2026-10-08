@@ -1,0 +1,21 @@
+services:
+  asf:
+    image: asf
+    container_name: asf
+
+    user: "${PUID}:${PGID}"
+    restart: unless-stopped
+
+    environment:
+      DOTNET_BUNDLE_EXTRACT_BASE_DIR: /tmp
+
+    ports:
+      - "127.0.0.1:1242:1242"
+      - "[::1]:1242:1242"
+
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+
+    networks:
+      - proxy
