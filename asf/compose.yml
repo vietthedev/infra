@@ -14,8 +14,8 @@ services:
       - "[::1]:1242:1242"
 
     volumes:
-      - ${HOME}/config:/app/config
-      - ${HOME}/logs:/app/logs
+      - ${HOME}/ASF/config:/app/config
+      - ${HOME}/ASF/logs:/app/logs
 
     networks:
       - proxy
