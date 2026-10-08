@@ -1,0 +1,16 @@
+# Assumes Cloudflare GLOBAL Authenticated Origin Pulls.
+# If your zone uses zone-level/per-hostname AOP instead, install its CA instead.
+(cloudflare_aop) {
+    tls {
+        client_auth {
+            mode require_and_verify
+            trust_pool file /etc/caddy/certs/cloudflare-origin-pull-ca.pem
+        }
+    }
+}
+
+(body_limit) {
+    request_body {
+        max_size 8MiB
+    }
+}

@@ -1,0 +1,12 @@
+# Never commit API tokens or other runtime secrets.
+/caddy/secrets/*
+!/caddy/secrets/.gitkeep
+
+# Do not commit private keys or arbitrary downloaded certs.
+/caddy/config/certs/*.pem
+/caddy/config/certs/*.key
+
+.env
+*.tar
+*.tar.gz
+.DS_Store

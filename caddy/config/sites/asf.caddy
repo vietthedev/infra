@@ -1,0 +1,8 @@
+asf.vietthe.dev {
+    import cloudflare_aop
+    import body_limit
+
+    # ASF must join the external "proxy" Docker network.
+    # Keep ASF IPC authentication enabled.
+    reverse_proxy asf:1242
+}

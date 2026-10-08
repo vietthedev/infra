@@ -1,0 +1,36 @@
+name: caddy-proxy
+
+services:
+  caddy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: caddy-cloudflare:2
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80/tcp"
+      - "443:443/tcp"
+      - "443:443/udp"
+    volumes:
+      - ./config:/etc/caddy:ro
+      - /srv/www/manabie:/srv/www/manabie:ro
+      - /srv/www/nana:/srv/www/nana:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    secrets:
+      - cloudflare_api_token
+    networks:
+      - proxy
+
+secrets:
+  cloudflare_api_token:
+    file: ./secrets/cloudflare_api_token
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  proxy:
+    external: true
