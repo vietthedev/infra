@@ -3,11 +3,10 @@ services:
     image: justarchi/archisteamfarm
     container_name: asf
 
-    user: "${PUID}:${PGID}"
     restart: unless-stopped
 
     environment:
-      ASF_UID: "1000"
+      ASF_UID: "1001"
       DOTNET_BUNDLE_EXTRACT_BASE_DIR: /tmp
 
     ports:
