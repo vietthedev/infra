@@ -1,0 +1,107 @@
+---
+- name: Gather system service facts
+  ansible.builtin.service_facts:
+
+- name: Verify Docker service is running
+  ansible.builtin.assert:
+    that:
+      - "'docker.service' in ansible_facts.services"
+      - "ansible_facts.services['docker.service'].state == 'running'"
+    fail_msg: "Docker Engine is not running"
+
+- name: Check Docker Engine version
+  become: true
+  ansible.builtin.command:
+    argv:
+      - docker
+      - version
+  register: docker_version
+  changed_when: false
+  check_mode: false
+
+- name: Check Docker Compose version
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - version
+  register: docker_compose_version
+  changed_when: false
+  check_mode: false
+
+- name: Check whether proxy network exists
+  become: true
+  ansible.builtin.command:
+    argv:
+      - docker
+      - network
+      - inspect
+      - "{{ docker_network_name }}"
+  register: docker_network_probe
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Create proxy network if missing
+  become: true
+  community.docker.docker_network:
+    name: "{{ docker_network_name }}"
+    driver: "{{ docker_network_driver }}"
+    state: present
+    appends: true
+    force: false
+  when:
+    - docker_manage_network | bool
+    - docker_network_probe.rc != 0
+    - "'not found' in docker_network_probe.stderr | lower"
+      # Adjust after inspecting the actual error if needed.
+
+- name: Inspect proxy network
+  become: true
+  ansible.builtin.command:
+    argv:
+      - docker
+      - network
+      - inspect
+      - "{{ docker_network_name }}"
+  register: docker_network_inspect
+  changed_when: false
+  check_mode: false
+
+- name: Parse Docker network information
+  ansible.builtin.set_fact:
+    docker_network_info: >-
+      {{ (docker_network_inspect.stdout | from_json)[0] }}
+
+- name: Verify network driver
+  ansible.builtin.assert:
+    that:
+      - docker_network_info.Driver == docker_network_driver
+    fail_msg: "Unexpected Docker network driver"
+
+- name: Get connected container names
+  ansible.builtin.set_fact:
+    docker_connected_containers: >-
+      {{
+        docker_network_info.Containers
+        | default({}, true)
+        | dict2items
+        | map(attribute='value.Name')
+        | list
+      }}
+
+- name: Verify expected containers are connected
+  ansible.builtin.assert:
+    that:
+      - item in docker_connected_containers
+    fail_msg: "{{ item }} is not connected to the proxy network"
+  loop: "{{ docker_expected_containers }}"
+
+- name: Show Docker infrastructure status
+  ansible.builtin.debug:
+    msg:
+      network: "{{ docker_network_name }}"
+      driver: "{{ docker_network_info.Driver }}"
+      containers: "{{ docker_connected_containers }}"
+      compose: "{{ docker_compose_version.stdout }}"
+

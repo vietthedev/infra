@@ -14,7 +14,15 @@ vps_asf_dir: /home/salad/ASF
 vps_web_root: /srv/www
 
 # Docker
-vps_docker_network: proxy
+docker_network_name: proxy
+docker_network_driver: bridge
+
+docker_expected_containers:
+  - caddy
+  - asf
+
+docker_manage_network: false
+docker_manage_packages: false
 
 # Services
 vps_services:

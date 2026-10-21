@@ -1,0 +1,8 @@
+---
+- name: Manage Docker infrastructure
+  hosts: vps
+  gather_facts: true
+
+  roles:
+    - docker
+
