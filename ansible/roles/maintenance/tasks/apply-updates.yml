@@ -1,0 +1,66 @@
+---
+- name: Verify explicit update approval
+  ansible.builtin.assert:
+    that:
+      - maintenance_upgrade_approval == 'APPLY_REVIEWED_UPDATES'
+      - not ansible_check_mode
+      - maintenance_pending_packages | length > 0
+      - maintenance_approved_packages | length > 0
+      - >-
+        (maintenance_pending_packages | sort)
+        ==
+        (maintenance_approved_packages | unique | sort)
+    fail_msg: >-
+      Package updates are not approved.
+      Review the proposed package list, then provide
+      the exact approval phrase and package names.
+
+- name: Apply reviewed APT upgrades
+  become: true
+  ansible.builtin.command:
+    argv:
+      - apt-get
+      - -y
+      - --no-remove
+      - -o
+      - Dpkg::Options::=--force-confdef
+      - -o
+      - Dpkg::Options::=--force-confold
+      - upgrade
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+    APT_LISTCHANGES_FRONTEND: none
+    NEEDRESTART_MODE: l
+  register: maintenance_upgrade_result
+  changed_when: true
+
+- name: Check package database after upgrade
+  become: true
+  ansible.builtin.command:
+    argv:
+      - dpkg
+      - --audit
+  register: maintenance_post_dpkg
+  changed_when: false
+  check_mode: false
+
+- name: Verify package database after upgrade
+  ansible.builtin.assert:
+    that:
+      - maintenance_post_dpkg.stdout | trim | length == 0
+    fail_msg: "Package database requires inspection after upgrade"
+
+- name: Check reboot-required marker after upgrade
+  become: true
+  ansible.builtin.stat:
+    path: /run/reboot-required
+  register: maintenance_post_reboot
+
+- name: Report package update result
+  ansible.builtin.debug:
+    msg:
+      approved_packages: "{{ maintenance_approved_packages }}"
+      reboot_required_marker: >-
+        {{ maintenance_post_reboot.stat.exists }}
+      automatic_reboot: false
+

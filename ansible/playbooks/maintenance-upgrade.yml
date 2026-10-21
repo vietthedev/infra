@@ -1,0 +1,25 @@
+---
+- name: Verify VPS health before maintenance
+  ansible.builtin.import_playbook: health.yml
+
+- name: Audit and optionally apply reviewed package updates
+  hosts: vps
+  gather_facts: true
+  serial: 1
+
+  pre_tasks:
+    - name: Initialize VPS variables
+      ansible.builtin.import_tasks: ../tasks/init.yml
+
+  roles:
+    - maintenance
+
+  tasks:
+    - name: Run guarded package maintenance
+      ansible.builtin.import_role:
+        name: maintenance
+        tasks_from: upgrade
+
+- name: Verify VPS health after maintenance
+  ansible.builtin.import_playbook: health.yml
+

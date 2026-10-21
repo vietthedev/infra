@@ -1,0 +1,188 @@
+---
+- name: Verify package updates are explicitly controlled
+  ansible.builtin.assert:
+    that:
+      - maintenance_allow_reboot == false
+      - maintenance_upgrade_min_free_mb | int >= 512
+    fail_msg: "Unsafe maintenance configuration"
+
+- name: Check local backup timer
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - vps-backup.timer
+  register: maintenance_backup_timer
+  changed_when: false
+  check_mode: false
+
+- name: Verify local backup timer
+  ansible.builtin.assert:
+    that:
+      - maintenance_backup_timer.stdout == 'active'
+
+- name: Verify no systemd backup is running
+  become: true
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - vps-backup.service
+  register: maintenance_backup_service
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Assert systemd backup is inactive
+  ansible.builtin.assert:
+    that:
+      - maintenance_backup_service.stdout == 'inactive'
+    fail_msg: "Backup job is running or in an unexpected state"
+
+- name: Find local backup archives
+  become: true
+  ansible.builtin.find:
+    paths: "{{ maintenance_backup_directory }}"
+    patterns: "vps-*.tar.gz"
+    file_type: file
+    recurse: false
+  register: maintenance_backup_files
+
+- name: Verify local backup archives exist
+  ansible.builtin.assert:
+    that:
+      - maintenance_backup_files.matched | int > 0
+    fail_msg: "No local VPS backup archives found"
+
+- name: Select newest backup archive
+  ansible.builtin.set_fact:
+    maintenance_latest_backup: >-
+      {{
+        (
+          maintenance_backup_files.files
+          | sort(attribute='mtime', reverse=true)
+        ) | first
+      }}
+
+- name: Verify backup filename
+  ansible.builtin.assert:
+    that:
+      - >-
+        maintenance_latest_backup.path | basename
+        is match('^vps-[0-9]{8}T[0-9]{6}Z\.tar\.gz$')
+    fail_msg: "Unexpected backup archive filename"
+
+- name: Check backup checksum file
+  become: true
+  ansible.builtin.stat:
+    path: "{{ maintenance_latest_backup.path }}.sha256"
+  register: maintenance_backup_checksum
+
+- name: Verify checksum file exists
+  ansible.builtin.assert:
+    that:
+      - maintenance_backup_checksum.stat.isreg | default(false)
+    fail_msg: "Latest backup has no checksum file"
+
+- name: Verify latest archive checksum
+  become: true
+  ansible.builtin.command:
+    argv:
+      - sha256sum
+      - -c
+      - --
+      - "{{ maintenance_latest_backup.path | basename }}.sha256"
+    chdir: "{{ maintenance_backup_directory }}"
+  register: maintenance_checksum_result
+  changed_when: false
+  check_mode: false
+
+- name: Verify latest backup is recent
+  ansible.builtin.assert:
+    that:
+      - >-
+        (
+          (ansible_facts['date_time']['epoch'] | int)
+          - (maintenance_latest_backup.mtime | int)
+        ) >= 0
+      - >-
+        (
+          (ansible_facts['date_time']['epoch'] | int)
+          - (maintenance_latest_backup.mtime | int)
+        ) <= (maintenance_backup_max_age_hours | int * 3600)
+    fail_msg: "Latest local backup is too old"
+
+- name: Check available disk space
+  ansible.builtin.command:
+    argv:
+      - df
+      - -Pm
+      - /
+  register: maintenance_upgrade_disk
+  changed_when: false
+  check_mode: false
+
+- name: Verify minimum available disk space
+  ansible.builtin.assert:
+    that:
+      - >-
+        (maintenance_upgrade_disk.stdout_lines[1].split()[3] | int)
+        >= (maintenance_upgrade_min_free_mb | int)
+    fail_msg: "Insufficient disk space for package maintenance"
+
+- name: Simulate APT upgrade
+  become: true
+  ansible.builtin.command:
+    argv:
+      - apt-get
+      - -s
+      - -o
+      - Debug::NoLocking=1
+      - upgrade
+  register: maintenance_upgrade_plan
+  changed_when: false
+  check_mode: false
+
+- name: Extract proposed package changes
+  ansible.builtin.set_fact:
+    maintenance_pending_packages: >-
+      {{
+        maintenance_upgrade_plan.stdout
+        | regex_findall('(?m)^Inst\s+(\S+)')
+        | unique
+        | sort
+      }}
+    maintenance_proposed_removals: >-
+      {{
+        maintenance_upgrade_plan.stdout
+        | regex_findall('(?m)^Remv\s+(\S+)')
+        | unique
+        | sort
+      }}
+
+- name: Reject package removals
+  ansible.builtin.assert:
+    that:
+      - maintenance_proposed_removals | length == 0
+    fail_msg: "APT proposes removing packages"
+
+- name: Display maintenance readiness report
+  ansible.builtin.debug:
+    msg:
+      backup: "{{ maintenance_latest_backup.path }}"
+      backup_checksum: verified
+      backup_age_hours: >-
+        {{
+          (
+            (ansible_facts['date_time']['epoch'] | int)
+            - (maintenance_latest_backup.mtime | int)
+          ) // 3600
+        }}
+      pending_packages: "{{ maintenance_pending_packages }}"
+      proposed_removals: "{{ maintenance_proposed_removals }}"
+      apply_updates: "{{ maintenance_apply_updates | bool }}"
+
+- name: Apply approved package updates
+  ansible.builtin.import_tasks: apply-updates.yml
+  when: maintenance_apply_updates | bool
+

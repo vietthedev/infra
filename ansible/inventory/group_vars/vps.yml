@@ -189,6 +189,21 @@ maintenance_apt_cache_valid_time: 3600
 # Minimum available disk space for maintenance
 maintenance_min_free_mb: 512
 
-# Package upgrades remain manual
+# Controlled package updates
 maintenance_apply_updates: false
+maintenance_upgrade_approval: ""
+
+# Exact package names approved for this execution.
+# An empty list never authorizes an upgrade.
+maintenance_approved_packages: []
+
+# Local backup prerequisites
+maintenance_backup_directory: "{{ backup_directory }}"
+maintenance_backup_max_age_hours: 36
+
+# Minimum free disk space before upgrades
+maintenance_upgrade_min_free_mb: 1024
+
+# No automatic reboot
+maintenance_allow_reboot: false
 
