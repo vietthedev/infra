@@ -119,3 +119,20 @@ backup_sources:
 
 backup_service_name: vps-backup.service
 backup_timer_name: vps-backup.timer
+
+# Firewall
+firewall_manage_rules: false
+
+firewall_expected_active: true
+firewall_default_incoming: deny
+firewall_default_outgoing: allow
+
+firewall_ssh_port: 22
+firewall_ssh_protocol: tcp
+
+# Expected UFW-managed inbound rules.
+# Start with SSH; audit any additional existing rules.
+firewall_allowed_rules:
+  - port: "{{ firewall_ssh_port }}"
+    proto: "{{ firewall_ssh_protocol }}"
+    rule: allow

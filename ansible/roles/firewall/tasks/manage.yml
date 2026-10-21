@@ -1,0 +1,24 @@
+---
+- name: Verify existing SSH rule representation
+  ansible.builtin.assert:
+    that:
+      - >-
+        ('ufw allow ' ~
+        (firewall_ssh_port | string) ~
+        '/tcp') in firewall_declared_rules.stdout_lines
+    fail_msg: >-
+      Existing SSH rule is not represented as
+      'ufw allow {{ firewall_ssh_port }}/tcp'.
+      Do not change the firewall until the
+      existing rule has been reviewed.
+
+- name: Ensure declared firewall allowances exist
+  become: true
+  community.general.ufw:
+    rule: "{{ item.rule }}"
+    port: "{{ item.port | string }}"
+    proto: "{{ item.proto }}"
+  loop: "{{ firewall_allowed_rules }}"
+  loop_control:
+    label: "{{ item.rule }} {{ item.port }}/{{ item.proto }}"
+

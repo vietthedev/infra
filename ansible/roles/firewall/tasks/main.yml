@@ -1,0 +1,104 @@
+---
+- name: Check UFW version
+  become: true
+  ansible.builtin.command:
+    argv:
+      - ufw
+      - version
+  register: firewall_version
+  changed_when: false
+  check_mode: false
+
+- name: Inspect UFW status
+  become: true
+  ansible.builtin.command:
+    argv:
+      - ufw
+      - status
+      - verbose
+  register: firewall_status
+  changed_when: false
+  check_mode: false
+
+- name: Inspect numbered UFW rules
+  become: true
+  ansible.builtin.command:
+    argv:
+      - ufw
+      - status
+      - numbered
+  register: firewall_numbered_rules
+  changed_when: false
+  check_mode: false
+
+- name: Inspect declared UFW rules
+  become: true
+  ansible.builtin.command:
+    argv:
+      - ufw
+      - show
+      - added
+  register: firewall_declared_rules
+  changed_when: false
+  check_mode: false
+
+- name: Inspect UFW IPv6 configuration
+  become: true
+  ansible.builtin.command:
+    argv:
+      - grep
+      - "^IPV6="
+      - /etc/default/ufw
+  register: firewall_ipv6
+  changed_when: false
+  check_mode: false
+
+- name: Verify UFW is active
+  ansible.builtin.assert:
+    that:
+      - >-
+        firewall_status.stdout is search(
+          '(?m)^Status: active\s*$'
+        )
+    fail_msg: "UFW is not active"
+
+- name: Verify UFW default policies
+  ansible.builtin.assert:
+    that:
+      - >-
+        firewall_status.stdout is search(
+          'Default: ' ~
+          firewall_default_incoming ~
+          ' \(incoming\), ' ~
+          firewall_default_outgoing ~
+          ' \(outgoing\)'
+        )
+    fail_msg: >-
+      UFW default policies differ from the
+      expected configuration.
+
+- name: Verify SSH firewall allowance
+  ansible.builtin.assert:
+    that:
+      - >-
+        firewall_status.stdout is search(
+          '(?m)^(' ~
+          (firewall_ssh_port | string) ~
+          '(/tcp)?|OpenSSH)\s+ALLOW IN\s+Anywhere'
+        )
+    fail_msg: >-
+      Expected SSH allowance not found.
+      Review UFW rules before proceeding.
+
+- name: Report firewall status
+  ansible.builtin.debug:
+    msg:
+      version: "{{ firewall_version.stdout }}"
+      status: "{{ firewall_status.stdout_lines }}"
+      ipv6: "{{ firewall_ipv6.stdout }}"
+      declared_rules: "{{ firewall_declared_rules.stdout_lines }}"
+
+- name: Manage firewall rules when explicitly enabled
+  ansible.builtin.include_tasks: manage.yml
+  when: firewall_manage_rules | bool
+
