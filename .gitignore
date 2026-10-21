@@ -7,6 +7,8 @@
 /caddy/config/certs/*.key
 
 .env
+.env.*
+!.env.example
 *.tar
 *.tar.gz
 .DS_Store
