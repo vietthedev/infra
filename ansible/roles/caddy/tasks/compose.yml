@@ -15,8 +15,8 @@
 
 - name: Preview Compose file differences
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../../docker/caddy/compose.yaml"
-    dest: "{{ caddy_project_dir }}/compose.yaml"
+    src: "{{ playbook_dir }}/../../docker/caddy/compose.yml"
+    dest: "{{ caddy_project_dir }}/compose.yml"
     mode: "0644"
   check_mode: true
   diff: true
@@ -24,8 +24,8 @@
 
 - name: Deploy approved Compose file
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../../docker/caddy/compose.yaml"
-    dest: "{{ caddy_project_dir }}/compose.yaml"
+    src: "{{ playbook_dir }}/../../docker/caddy/compose.yml"
+    dest: "{{ caddy_project_dir }}/compose.yml"
     mode: "0644"
     backup: true
   when:

@@ -1,9 +1,0 @@
-{
-    email vietthedev@gmail.com
-
-    # Cloudflare DNS-01: works before DNS A/AAAA cutover.
-    acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
-}
-
-import snippets/*.caddy
-import sites/*.caddy
