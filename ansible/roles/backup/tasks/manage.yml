@@ -1,0 +1,108 @@
+---
+- name: Create backup directory
+  become: true
+  ansible.builtin.file:
+    path: "{{ backup_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Create backup configuration directory
+  become: true
+  ansible.builtin.file:
+    path: "{{ backup_paths_file | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Deploy backup source list
+  become: true
+  ansible.builtin.copy:
+    content: "{{ backup_sources | join('\n') }}\n"
+    dest: "{{ backup_paths_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Deploy backup script
+  become: true
+  ansible.builtin.copy:
+    src: vps-backup.sh
+    dest: "{{ backup_script }}"
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Deploy backup service
+  become: true
+  ansible.builtin.copy:
+    src: vps-backup.service
+    dest: /etc/systemd/system/vps-backup.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: backup_service_unit
+
+- name: Deploy backup timer
+  become: true
+  ansible.builtin.copy:
+    src: vps-backup.timer
+    dest: /etc/systemd/system/vps-backup.timer
+    owner: root
+    group: root
+    mode: "0644"
+  register: backup_timer_unit
+
+- name: Reload systemd units
+  become: true
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: >-
+    backup_service_unit.changed or
+    backup_timer_unit.changed
+
+- name: Manage backup timer
+  become: true
+  ansible.builtin.systemd_service:
+    name: "{{ backup_timer_name }}"
+    enabled: "{{ backup_enable_timer | bool }}"
+    state: >-
+      {{
+        'started'
+        if backup_enable_timer | bool
+        else 'stopped'
+      }}
+
+- name: Apply updated timer schedule
+  become: true
+  ansible.builtin.systemd_service:
+    name: "{{ backup_timer_name }}"
+    state: restarted
+  when:
+    - backup_enable_timer | bool
+    - backup_timer_unit.changed
+
+- name: Deploy backup settings
+  become: true
+  ansible.builtin.copy:
+    dest: "{{ backup_settings_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+    content: |
+      BACKUP_KEEP_COUNT={{ backup_keep_count | int }}
+      BACKUP_MIN_AGE_HOURS={{ backup_min_age_hours | int }}
+      BACKUP_MIN_FREE_MB={{ backup_min_free_mb | int }}
+      BACKUP_ENABLE_RETENTION={{ (backup_enable_retention | bool) | ternary('1', '0') }}
+
+- name: Deploy backup retention script
+  become: true
+  ansible.builtin.copy:
+    src: vps-backup-retain.sh
+    dest: "{{ backup_retention_script }}"
+    owner: root
+    group: root
+    mode: "0700"
+

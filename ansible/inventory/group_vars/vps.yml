@@ -90,3 +90,32 @@ asf_compose_destination: "{{ asf_project_dir }}/compose.yml"
 # Management disabled during adoption
 asf_manage_compose: false
 
+# Local backup management
+backup_manage: true
+backup_enable_timer: true
+
+backup_directory: /var/backups/vps
+backup_script: /usr/local/sbin/vps-backup
+backup_paths_file: /etc/vps-backup/paths
+
+# Retention and disk safeguards
+backup_settings_file: /etc/vps-backup/settings.conf
+backup_retention_script: /usr/local/sbin/vps-backup-retain
+
+backup_keep_count: 7
+backup_min_age_hours: 48
+backup_min_free_mb: 512
+
+# Enable only after reviewing the dry run
+backup_enable_retention: true
+
+backup_sources:
+  - "{{ asf_config_dir }}"
+  - "{{ caddy_config_destination }}"
+  - "{{ caddy_env_file }}"
+  - "{{ caddy_project_dir }}/compose.yml"
+  - "{{ asf_compose_destination }}"
+  - "{{ vps_web_root }}"
+
+backup_service_name: vps-backup.service
+backup_timer_name: vps-backup.timer

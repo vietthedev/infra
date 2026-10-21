@@ -1,0 +1,3 @@
+- name: Configure managed backups
+  ansible.builtin.include_tasks: manage.yml
+  when: backup_manage | bool

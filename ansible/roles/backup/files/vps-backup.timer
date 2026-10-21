@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily local VPS backup
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+RandomizedDelaySec=15m
+Unit=vps-backup.service
+
+[Install]
+WantedBy=timers.target
+
