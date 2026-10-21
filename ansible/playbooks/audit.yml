@@ -1,0 +1,47 @@
+---
+- name: Audit existing Debian VPS
+  hosts: vps
+  gather_facts: true
+
+  tasks:
+    - name: Show system information
+      ansible.builtin.debug:
+        msg:
+          hostname: "{{ ansible_facts['hostname'] }}"
+          os: "{{ ansible_facts['distribution'] }}"
+          version: "{{ ansible_facts['distribution_version'] }}"
+          architecture: "{{ ansible_facts['architecture'] }}"
+          python: "{{ ansible_facts['python_version'] }}"
+
+    - name: Check Docker version
+      ansible.builtin.command:
+        argv:
+          - docker
+          - version
+          - --format
+          - "{% raw %}{{.Server.Version}}{% endraw %}"
+      register: docker_version
+      changed_when: false
+
+    - name: Show Docker version
+      ansible.builtin.debug:
+        var: docker_version.stdout
+
+    - name: Check Docker Compose
+      ansible.builtin.command: docker compose version
+      register: compose_version
+      changed_when: false
+
+    - name: Show Docker Compose version
+      ansible.builtin.debug:
+        var: compose_version.stdout
+
+    - name: List running containers
+      ansible.builtin.command: docker ps
+      register: containers
+      changed_when: false
+
+    - name: Show running containers
+      ansible.builtin.debug:
+        var: containers.stdout_lines
+
