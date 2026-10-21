@@ -182,3 +182,13 @@ health_endpoints:
 health_backup_timer: vps-backup.timer
 health_min_free_mb: 512
 
+# OS maintenance
+maintenance_manage_apt_cache: false
+maintenance_apt_cache_valid_time: 3600
+
+# Minimum available disk space for maintenance
+maintenance_min_free_mb: 512
+
+# Package upgrades remain manual
+maintenance_apply_updates: false
+

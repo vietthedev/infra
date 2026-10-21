@@ -1,0 +1,14 @@
+---
+- name: Refresh APT package metadata
+  become: true
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: "{{ maintenance_apt_cache_valid_time }}"
+  register: maintenance_cache_refresh
+
+- name: Report APT cache refresh
+  ansible.builtin.debug:
+    msg: >-
+      APT metadata updated:
+      {{ maintenance_cache_refresh.cache_updated | default(false) }}
+

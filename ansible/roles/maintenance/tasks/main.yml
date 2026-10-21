@@ -1,0 +1,125 @@
+---
+- name: Verify supported operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['distribution'] == vps_distribution
+      - >-
+        (ansible_facts['distribution_major_version'] | string)
+        == vps_distribution_major_version
+    fail_msg: "Unexpected operating system or version"
+
+- name: Check available root filesystem space
+  ansible.builtin.command:
+    argv:
+      - df
+      - -Pm
+      - /
+  register: maintenance_disk
+  changed_when: false
+  check_mode: false
+
+- name: Verify minimum free disk space
+  ansible.builtin.assert:
+    that:
+      - >-
+        (maintenance_disk.stdout_lines[1].split()[3] | int)
+        >= (maintenance_min_free_mb | int)
+    fail_msg: "Insufficient free disk space for maintenance"
+
+- name: Inspect package database health
+  become: true
+  ansible.builtin.command:
+    argv:
+      - dpkg
+      - --audit
+  register: maintenance_dpkg_audit
+  changed_when: false
+  check_mode: false
+
+- name: Verify package database health
+  ansible.builtin.assert:
+    that:
+      - maintenance_dpkg_audit.stdout | trim | length == 0
+    fail_msg: >-
+      dpkg reports partially installed or incorrectly
+      configured packages. Inspect before upgrading.
+
+- name: Refresh APT metadata when explicitly requested
+  ansible.builtin.include_tasks: refresh.yml
+  when: maintenance_manage_apt_cache | bool
+
+- name: Simulate regular package upgrades
+  become: true
+  ansible.builtin.command:
+    argv:
+      - apt-get
+      - -s
+      - -o
+      - Debug::NoLocking=1
+      - upgrade
+  register: maintenance_upgrade
+  changed_when: false
+  check_mode: false
+
+- name: Simulate full package upgrades
+  become: true
+  ansible.builtin.command:
+    argv:
+      - apt-get
+      - -s
+      - -o
+      - Debug::NoLocking=1
+      - dist-upgrade
+  register: maintenance_dist_upgrade
+  changed_when: false
+  check_mode: false
+
+- name: Inspect reboot-required marker
+  become: true
+  ansible.builtin.stat:
+    path: /run/reboot-required
+  register: maintenance_reboot_marker
+
+- name: Inspect APT automatic-update timers
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - list-timers
+      - --all
+      - --no-pager
+      - apt-daily.timer
+      - apt-daily-upgrade.timer
+  register: maintenance_apt_timers
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Report OS maintenance status
+  ansible.builtin.debug:
+    msg:
+      distribution: "{{ ansible_facts['distribution'] }}"
+      version: "{{ ansible_facts['distribution_version'] }}"
+      free_disk_mb: >-
+        {{ maintenance_disk.stdout_lines[1].split()[3] | int }}
+      package_database: healthy
+      regular_upgrade_packages: >-
+        {{
+          maintenance_upgrade.stdout
+          | regex_findall('(?m)^Inst\s+(\S+)')
+        }}
+      dist_upgrade_packages: >-
+        {{
+          maintenance_dist_upgrade.stdout
+          | regex_findall('(?m)^Inst\s+(\S+)')
+        }}
+      proposed_package_removals: >-
+        {{
+          maintenance_dist_upgrade.stdout
+          | regex_findall('(?m)^Remv\s+(\S+)')
+        }}
+      reboot_marker_present: >-
+        {{ maintenance_reboot_marker.stat.exists }}
+      apt_timers: "{{ maintenance_apt_timers.stdout_lines }}"
+      apt_metadata_refreshed_by_playbook: >-
+        {{ maintenance_manage_apt_cache | bool }}
+
