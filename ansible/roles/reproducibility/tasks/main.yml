@@ -1,0 +1,20 @@
+---
+- name: Audit essential filesystem paths
+  ansible.builtin.import_tasks: filesystem.yml
+
+- name: Audit Docker runtime
+  ansible.builtin.import_tasks: docker.yml
+
+- name: Audit custom systemd units
+  ansible.builtin.import_tasks: systemd.yml
+
+- name: Audit Git-managed source files
+  ansible.builtin.import_tasks: repository.yml
+
+- name: Report reproducibility audit completion
+  ansible.builtin.debug:
+    msg: >-
+      Reproducibility checks passed.
+      Review discovered Docker volumes and custom
+      systemd units for any remaining unmanaged state.
+

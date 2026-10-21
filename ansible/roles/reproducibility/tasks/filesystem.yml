@@ -1,0 +1,35 @@
+---
+- name: Inspect required live paths
+  become: true
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: true
+    get_checksum: false
+  loop: "{{ repro_required_paths }}"
+  register: repro_path_stats
+
+- name: Verify essential paths exist
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists | default(false)
+    fail_msg: "Missing essential path: {{ item.item }}"
+  loop: "{{ repro_path_stats.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Verify critical paths are declared for backup
+  ansible.builtin.assert:
+    that:
+      - item in backup_sources
+    fail_msg: >-
+      Critical path is not explicitly included
+      in backup_sources: {{ item }}
+  loop: "{{ repro_required_backup_sources }}"
+
+- name: Report backup coverage
+  ansible.builtin.debug:
+    msg:
+      required_sources: "{{ repro_required_backup_sources }}"
+      backup_directory: "{{ backup_directory }}"
+      coverage: declared
+

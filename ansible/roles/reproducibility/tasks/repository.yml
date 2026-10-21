@@ -1,0 +1,44 @@
+---
+- name: Inspect version-controlled deployment sources
+  become: false
+  delegate_to: localhost
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ repro_repository_files }}"
+  register: repro_repo_stats
+
+- name: Verify deployment sources exist
+  ansible.builtin.assert:
+    that:
+      - item.stat.isreg | default(false)
+    fail_msg: >-
+      Missing deployment source:
+      {{ item.item }}
+  loop: "{{ repro_repo_stats.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Check that deployment environment files are not tracked
+  become: false
+  delegate_to: localhost
+  ansible.builtin.command:
+    argv:
+      - git
+      - -C
+      - "{{ playbook_dir }}/../.."
+      - ls-files
+      - --
+      - docker/caddy/.env
+      - docker/asf/.env
+  register: repro_tracked_env_files
+  changed_when: false
+  check_mode: false
+
+- name: Verify environment files are excluded from Git
+  ansible.builtin.assert:
+    that:
+      - repro_tracked_env_files.stdout | trim == ''
+    fail_msg: >-
+      A deployment .env file is tracked by Git.
+      Review repository history and exposed secrets.
+

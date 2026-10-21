@@ -1,0 +1,41 @@
+---
+- name: Discover locally installed systemd units
+  become: true
+  ansible.builtin.find:
+    paths: /etc/systemd/system
+    patterns:
+      - "*.service"
+      - "*.timer"
+      - "*.socket"
+    recurse: true
+    file_type: file
+  register: repro_systemd_files
+
+- name: Report locally installed systemd units
+  ansible.builtin.debug:
+    msg:
+      unit_files: >-
+        {{
+          repro_systemd_files.files
+          | map(attribute='path')
+          | list
+          | sort
+        }}
+
+- name: Inspect local backup service
+  become: true
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-enabled
+      - vps-backup.timer
+  register: repro_backup_timer
+  changed_when: false
+  check_mode: false
+
+- name: Verify local backup schedule is enabled
+  ansible.builtin.assert:
+    that:
+      - repro_backup_timer.stdout == 'enabled'
+    fail_msg: "Local backup timer is not enabled"
+

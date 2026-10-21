@@ -1,0 +1,91 @@
+---
+- name: Inspect existing Docker containers
+  become: true
+  community.docker.docker_container_info:
+    name: "{{ item }}"
+  loop: "{{ repro_expected_containers }}"
+  register: repro_containers
+  no_log: true
+
+- name: Verify expected containers are running
+  ansible.builtin.assert:
+    that:
+      - item.exists
+      - item.container.State.Running | default(false)
+    fail_msg: "Expected container is missing or stopped"
+  loop: "{{ repro_containers.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Report Compose identity and mounts
+  ansible.builtin.debug:
+    msg:
+      container: "{{ item.item }}"
+      compose_project: >-
+        {{
+          item.container.Config.Labels.get(
+            'com.docker.compose.project',
+            'unknown'
+          )
+        }}
+      compose_working_directory: >-
+        {{
+          item.container.Config.Labels.get(
+            'com.docker.compose.project.working_dir',
+            'unknown'
+          )
+        }}
+      bind_mount_sources: >-
+        {{
+          item.container.Mounts
+          | selectattr('Type', 'equalto', 'bind')
+          | map(attribute='Source')
+          | list
+        }}
+      named_volumes: >-
+        {{
+          item.container.Mounts
+          | selectattr('Type', 'equalto', 'volume')
+          | map(attribute='Name')
+          | list
+        }}
+      mount_destinations: >-
+        {{
+          item.container.Mounts
+          | map(attribute='Destination')
+          | list
+        }}
+  loop: "{{ repro_containers.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: List Docker named volumes
+  become: true
+  ansible.builtin.command:
+    argv:
+      - docker
+      - volume
+      - ls
+      - -q
+  register: repro_docker_volumes
+  changed_when: false
+  check_mode: false
+
+- name: Report discovered Docker volumes
+  ansible.builtin.debug:
+    msg:
+      named_volumes: "{{ repro_docker_volumes.stdout_lines }}"
+
+- name: Verify existing proxy network
+  become: true
+  ansible.builtin.command:
+    argv:
+      - docker
+      - network
+      - inspect
+      - "{{ docker_network_name }}"
+  register: repro_proxy_network
+  changed_when: false
+  check_mode: false
+  no_log: true
+

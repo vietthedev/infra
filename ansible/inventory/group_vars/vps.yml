@@ -207,3 +207,35 @@ maintenance_upgrade_min_free_mb: 1024
 # No automatic reboot
 maintenance_allow_reboot: false
 
+# Infrastructure reproducibility audit
+repro_expected_containers: "{{ docker_expected_containers }}"
+
+# Essential live paths
+repro_required_paths:
+  - "{{ caddy_project_dir }}/compose.yml"
+  - "{{ caddy_config_destination }}/Caddyfile"
+  - "{{ caddy_env_file }}"
+  - "{{ asf_compose_destination }}"
+  - "{{ asf_config_dir }}"
+  - "{{ vps_web_root }}/manabie/index.html"
+  - "{{ vps_web_root }}/nana/index.html"
+  - "{{ backup_script }}"
+  - "{{ backup_paths_file }}"
+  - "{{ backup_settings_file }}"
+
+# Critical sources that should be in local backups
+repro_required_backup_sources:
+  - "{{ asf_config_dir }}"
+  - "{{ caddy_env_file }}"
+  - "{{ caddy_config_destination }}"
+  - "{{ caddy_project_dir }}/compose.yml"
+  - "{{ asf_compose_destination }}"
+  - "{{ vps_web_root }}"
+
+# Expected version-controlled deployment sources
+repro_repository_files:
+  - "{{ playbook_dir }}/../../docker/caddy/Dockerfile"
+  - "{{ playbook_dir }}/../../docker/caddy/compose.yml"
+  - "{{ playbook_dir }}/../../docker/caddy/config/Caddyfile"
+  - "{{ playbook_dir }}/../../docker/asf/compose.yml"
+
