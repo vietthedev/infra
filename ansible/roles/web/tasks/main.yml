@@ -1,0 +1,75 @@
+---
+- name: Inspect website document roots
+  become: true
+  ansible.builtin.stat:
+    path: "{{ item.root }}"
+    follow: true
+    get_checksum: false
+  loop: "{{ web_sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: web_root_stats
+
+- name: Verify website document roots
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists | default(false)
+      - item.stat.isdir | default(false)
+    fail_msg: >-
+      Website {{ item.item.name }} has an invalid
+      document root: {{ item.item.root }}
+  loop: "{{ web_root_stats.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Inspect website entry points
+  become: true
+  ansible.builtin.stat:
+    path: "{{ item.root }}/index.html"
+    follow: true
+    checksum_algorithm: sha256
+    get_mime: false
+  loop: "{{ web_sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: web_entrypoint_stats
+
+- name: Verify website entry points
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists | default(false)
+      - item.stat.isreg | default(false)
+      - item.stat.size | int > 0
+    fail_msg: >-
+      Missing or empty index.html for
+      {{ item.item.name }}.
+      Expected: {{ item.item.root }}/index.html
+  loop: "{{ web_entrypoint_stats.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Report website directory metadata
+  ansible.builtin.debug:
+    msg:
+      site: "{{ item.item.name }}"
+      root: "{{ item.item.root }}"
+      owner: "{{ item.stat.pw_name }}"
+      group: "{{ item.stat.gr_name }}"
+      mode: "{{ item.stat.mode }}"
+  loop: "{{ web_root_stats.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Report website entry point checksums
+  ansible.builtin.debug:
+    msg:
+      site: "{{ item.item.name }}"
+      sha256: "{{ item.stat.checksum }}"
+  loop: "{{ web_entrypoint_stats.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Manage website directories
+  ansible.builtin.include_tasks: directories.yml
+  when: web_manage_directories | bool
+

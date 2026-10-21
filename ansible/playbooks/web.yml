@@ -1,0 +1,12 @@
+---
+- name: Adopt VPS static websites
+  hosts: vps
+  gather_facts: true
+
+  pre_tasks:
+    - name: Initialize VPS variables
+      ansible.builtin.import_tasks: ../tasks/init.yml
+
+  roles:
+    - web
+

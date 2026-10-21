@@ -1,0 +1,58 @@
+---
+- name: Verify directory management definitions
+  ansible.builtin.assert:
+    that:
+      - web_directory_metadata | length == web_sites | length
+      - >-
+        (
+          web_directory_metadata
+          | map(attribute='root')
+          | list
+          | sort
+        ) ==
+        (
+          web_sites
+          | map(attribute='root')
+          | list
+          | sort
+        )
+    fail_msg: >-
+      Website directory metadata must exactly
+      match the configured document roots.
+
+- name: Inspect actual directory objects
+  become: true
+  ansible.builtin.stat:
+    path: "{{ item.root }}"
+    follow: false
+  loop: "{{ web_directory_metadata }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: web_directory_objects
+
+- name: Prevent managing missing or symlinked roots
+  ansible.builtin.assert:
+    that:
+      - item.stat.isdir | default(false)
+      - not (item.stat.islnk | default(false))
+    fail_msg: >-
+      {{ item.item.root }} is not a real directory.
+      Review its deployment layout before
+      enabling directory management.
+  loop: "{{ web_directory_objects.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Manage existing website directory metadata
+  become: true
+  ansible.builtin.file:
+    path: "{{ item.root }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+    recurse: false
+  loop: "{{ web_directory_metadata }}"
+  loop_control:
+    label: "{{ item.name }}"
+

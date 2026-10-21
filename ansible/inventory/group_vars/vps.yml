@@ -136,3 +136,32 @@ firewall_allowed_rules:
   - port: "{{ firewall_ssh_port }}"
     proto: "{{ firewall_ssh_protocol }}"
     rule: allow
+
+# Static websites
+web_manage_directories: true
+
+web_sites:
+  - name: manabie
+    root: "{{ vps_web_root }}/manabie"
+    domain: manabie.vietthe.dev
+    type: spa
+
+  - name: nana
+    root: "{{ vps_web_root }}/nana"
+    domain: nana.vietthe.dev
+    type: static
+
+# Populate with observed directory metadata
+# before enabling management.
+web_directory_metadata:
+  - name: manabie
+    root: "{{ vps_web_root }}/manabie"
+    owner: root
+    group: root
+    mode: "0755"
+
+  - name: nana
+    root: "{{ vps_web_root }}/nana"
+    owner: root
+    group: root
+    mode: "0755"
