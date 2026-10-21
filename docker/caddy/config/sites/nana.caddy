@@ -1,0 +1,8 @@
+nana.vietthe.dev {
+    import cloudflare_aop
+    import body_limit
+
+    root * /srv/www/nana
+    try_files {path} {path}/ /index.html =404
+    file_server
+}
