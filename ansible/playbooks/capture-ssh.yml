@@ -1,0 +1,18 @@
+---
+- name: Capture existing SSH configuration
+  hosts: vps
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Validate current SSH configuration
+      ansible.builtin.command:
+        cmd: /usr/sbin/sshd -t
+      changed_when: false
+
+    - name: Fetch SSH hardening configuration
+      ansible.builtin.fetch:
+        src: /etc/ssh/sshd_config.d/10-hardening.conf
+        dest: "{{ playbook_dir }}/../roles/ssh/files/10-hardening.conf"
+        flat: true
+

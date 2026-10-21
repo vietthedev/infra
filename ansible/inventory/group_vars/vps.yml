@@ -1,0 +1,35 @@
+---
+# Operating system
+vps_distribution: Debian
+vps_distribution_major_version: "13"
+
+# Administrator
+vps_user: salad
+
+# Infrastructure paths
+vps_home: /home/salad
+vps_infra_dir: /home/salad/infra
+vps_caddy_dir: /home/salad/infra/caddy
+vps_asf_dir: /home/salad/ASF
+vps_web_root: /srv/www
+
+# Docker
+vps_docker_network: proxy
+
+# Services
+vps_services:
+  - docker
+  - ssh
+
+# Public applications
+vps_domains:
+  - asf.vietthe.dev
+  - manabie.vietthe.dev
+  - nana.vietthe.dev
+
+# SSH configuration management
+ssh_manage_config: true
+
+ssh_config_path: /etc/ssh/sshd_config.d/10-hardening.conf
+ssh_service_name: ssh
+

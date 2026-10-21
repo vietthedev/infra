@@ -1,0 +1,52 @@
+---
+- name: Check SSH configuration file
+  become: true
+  ansible.builtin.stat:
+    path: "{{ ssh_config_path }}"
+  register: ssh_config
+
+- name: Verify SSH configuration exists
+  ansible.builtin.assert:
+    that:
+      - ssh_config.stat.exists
+      - ssh_config.stat.isreg
+    fail_msg: "Expected SSH configuration file not found"
+
+- name: Validate current SSH configuration
+  become: true
+  ansible.builtin.command:
+    cmd: /usr/sbin/sshd -t
+  changed_when: false
+  check_mode: false
+
+- name: Manage SSH hardening configuration
+  become: true
+  ansible.builtin.copy:
+    src: 10-hardening.conf
+    dest: "{{ ssh_config_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+    validate: "/usr/sbin/sshd -t -f %s"
+  when: ssh_manage_config | bool
+  notify: Validate and reload SSH
+
+- name: Read effective SSH configuration
+  become: true
+  ansible.builtin.command:
+    cmd: /usr/sbin/sshd -T
+  register: ssh_effective_config
+  changed_when: false
+  check_mode: false
+
+- name: Verify SSH security settings
+  ansible.builtin.assert:
+    that:
+      - "'permitrootlogin no' in ssh_effective_config.stdout_lines"
+      - "'pubkeyauthentication yes' in ssh_effective_config.stdout_lines"
+      - "'passwordauthentication no' in ssh_effective_config.stdout_lines"
+      - "'kbdinteractiveauthentication no' in ssh_effective_config.stdout_lines"
+      - "'x11forwarding no' in ssh_effective_config.stdout_lines"
+    fail_msg: "Effective SSH configuration differs from expected security settings"
+

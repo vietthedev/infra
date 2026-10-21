@@ -1,0 +1,9 @@
+---
+- name: Manage SSH configuration
+  hosts: vps
+  gather_facts: true
+  serial: 1
+
+  roles:
+    - ssh
+

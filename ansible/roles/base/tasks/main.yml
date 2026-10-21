@@ -1,0 +1,12 @@
+---
+- name: Ensure base utilities are installed
+  become: true
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - git
+      - rsync
+      - python3
+    state: present
+

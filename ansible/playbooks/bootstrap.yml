@@ -1,0 +1,8 @@
+---
+- name: Configure Debian VPS baseline
+  hosts: vps
+  gather_facts: true
+
+  roles:
+    - base
+

@@ -1,0 +1,87 @@
+---
+- name: Adopt existing Debian VPS
+  hosts: vps
+  gather_facts: true
+
+  tasks:
+    - name: Verify operating system
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] == vps_distribution
+          - ansible_facts['distribution_major_version'] == vps_distribution_major_version
+        fail_msg: "Unexpected operating system"
+
+    - name: Inspect infrastructure directories
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ vps_infra_dir }}"
+        - "{{ vps_caddy_dir }}"
+        - "{{ vps_asf_dir }}"
+        - "{{ vps_web_root }}"
+      register: infrastructure_dirs
+
+    - name: Report missing directories
+      ansible.builtin.debug:
+        msg: "Missing directory: {{ item.item }}"
+      loop: "{{ infrastructure_dirs.results }}"
+      when: not item.stat.exists
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Gather service information
+      ansible.builtin.service_facts:
+
+    - name: Verify required services
+      ansible.builtin.assert:
+        that:
+          - (item + '.service') in ansible_facts.services
+          - ansible_facts.services[item + '.service'].state == 'running'
+        fail_msg: "Required service {{ item }} is not running"
+      loop: "{{ vps_services }}"
+
+    - name: Inspect Docker containers
+      ansible.builtin.command:
+        argv:
+          - docker
+          - ps
+      register: docker_containers
+      changed_when: false
+      check_mode: false
+
+    - name: Show Docker containers
+      ansible.builtin.debug:
+        var: docker_containers.stdout_lines
+
+    - name: Inspect Docker networks
+      ansible.builtin.command:
+        argv:
+          - docker
+          - network
+          - ls
+      register: docker_networks
+      changed_when: false
+      check_mode: false
+
+    - name: Show Docker networks
+      ansible.builtin.debug:
+        var: docker_networks.stdout_lines
+    
+    - name: Inspect UFW firewall status
+      become: true
+      ansible.builtin.command:
+        cmd: ufw status verbose
+      register: ufw_status
+      changed_when: false
+      check_mode: false
+
+    - name: Verify UFW is active
+      ansible.builtin.assert:
+        that:
+          - "'Status: active' in ufw_status.stdout"
+        fail_msg: "UFW firewall is not active"
+
+    - name: Show firewall status
+      ansible.builtin.debug:
+        var: ufw_status.stdout_lines
+
