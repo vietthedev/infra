@@ -1,0 +1,118 @@
+---
+- name: Inspect ASF container
+  become: true
+  ansible.builtin.command:
+    argv:
+      - docker
+      - inspect
+      - "{{ asf_container_name }}"
+  register: asf_inspect
+  changed_when: false
+  check_mode: false
+  no_log: true
+
+- name: Parse ASF container information
+  ansible.builtin.set_fact:
+    asf_info: "{{ (asf_inspect.stdout | from_json)[0] }}"
+  no_log: true
+
+- name: Verify ASF is running
+  ansible.builtin.assert:
+    that:
+      - asf_info.State.Running | bool
+    fail_msg: "ASF container is not running"
+
+- name: Verify ASF Compose ownership
+  ansible.builtin.assert:
+    that:
+      - >-
+        asf_info.Config.Labels.get(
+          'com.docker.compose.service', ''
+        ) == 'asf'
+      - >-
+        asf_info.Config.Labels.get(
+          'com.docker.compose.project.working_dir', ''
+        ) == asf_project_dir
+    fail_msg: >-
+      ASF Compose working directory mismatch.
+      Actual: {{
+        asf_info.Config.Labels.get(
+          'com.docker.compose.project.working_dir',
+          'unknown'
+        )
+      }}
+      Expected: {{ asf_project_dir }}
+    success_msg: "ASF Compose identity verified"
+
+- name: Record existing Compose project
+  ansible.builtin.set_fact:
+    asf_compose_project: >-
+      {{ asf_info.Config.Labels['com.docker.compose.project'] }}
+
+- name: Verify proxy network membership
+  ansible.builtin.assert:
+    that:
+      - docker_network_name in asf_info.NetworkSettings.Networks
+    fail_msg: "ASF is not connected to the proxy network"
+
+- name: Check ASF configuration directory
+  ansible.builtin.stat:
+    path: "{{ asf_config_dir }}"
+  register: asf_config_stat
+
+- name: Verify configuration directory exists
+  ansible.builtin.assert:
+    that:
+      - asf_config_stat.stat.isdir | default(false)
+
+- name: Identify configuration mounts
+  ansible.builtin.set_fact:
+    asf_config_mounts: >-
+      {{
+        asf_info.Mounts
+        | selectattr('Destination', 'equalto', '/app/config')
+        | list
+      }}
+
+- name: Verify persistent configuration mount
+  ansible.builtin.assert:
+    that:
+      - asf_config_mounts | length == 1
+      - asf_config_mounts[0].Type == 'bind'
+      - asf_config_mounts[0].Source == asf_config_dir
+    fail_msg: "ASF configuration mount differs from expected path"
+
+- name: Get host user UID
+  ansible.builtin.command:
+    argv:
+      - id
+      - -u
+      - "{{ vps_user }}"
+  register: asf_host_uid
+  changed_when: false
+  check_mode: false
+
+- name: Verify ASF user configuration
+  ansible.builtin.assert:
+    that:
+      - (asf_info.Config.User | default('', true)) == ''
+      - >-
+        ('ASF_UID=' ~ asf_host_uid.stdout)
+        in asf_info.Config.Env
+    fail_msg: >-
+      ASF user configuration does not match the
+      host account {{ vps_user }}.
+    success_msg: >-
+      ASF is configured to use UID
+      {{ asf_host_uid.stdout }} via ASF_UID.
+
+- name: Show ASF deployment summary
+  ansible.builtin.debug:
+    msg:
+      project: "{{ asf_compose_project }}"
+      image: "{{ asf_info.Config.Image }}"
+      user: "{{ asf_info.Config.User }}"
+      network: "{{ docker_network_name }}"
+      config_mount: "{{ asf_config_dir }}"
+      running: "{{ asf_info.State.Running }}"
+

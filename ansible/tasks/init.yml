@@ -1,0 +1,13 @@
+---
+- name: Look up VPS administrator account
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ vps_user }}"
+    fail_key: true
+
+- name: Verify administrator home directory
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['getent_passwd'][vps_user][4] | length > 0
+    fail_msg: "Could not resolve home directory for {{ vps_user }}"
+

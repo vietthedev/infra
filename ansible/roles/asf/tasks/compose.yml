@@ -1,0 +1,43 @@
+---
+- name: Check local ASF Compose file
+  ansible.builtin.stat:
+    path: "{{ asf_compose_source }}"
+  delegate_to: localhost
+  become: false
+  register: asf_local_compose
+
+- name: Verify local Compose file exists
+  ansible.builtin.assert:
+    that:
+      - asf_local_compose.stat.isreg | default(false)
+      - asf_local_compose.stat.readable | default(false)
+
+- name: Preview ASF Compose differences
+  ansible.builtin.copy:
+    src: "{{ asf_compose_source }}"
+    dest: "{{ asf_compose_destination }}"
+    mode: "0644"
+  check_mode: true
+  diff: true
+  register: asf_compose_preview
+
+- name: Require matching Compose definitions during adoption
+  ansible.builtin.assert:
+    that:
+      - not asf_compose_preview.changed
+    fail_msg: >-
+      ASF Compose differs from the deployed file.
+      Review differences before enabling management.
+  when: asf_manage_compose | bool
+
+- name: Adopt existing Compose definition
+  ansible.builtin.copy:
+    src: "{{ asf_compose_source }}"
+    dest: "{{ asf_compose_destination }}"
+    mode: "0644"
+    backup: true
+  when:
+    - asf_manage_compose | bool
+    - not ansible_check_mode
+    - not asf_compose_preview.changed
+

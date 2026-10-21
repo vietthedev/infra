@@ -1,0 +1,19 @@
+---
+- name: Adopt ASF Compose deployment
+  hosts: vps
+  gather_facts: true
+
+  pre_tasks:
+    - name: Initialize VPS variables
+      ansible.builtin.import_tasks: ../tasks/init.yml
+
+  tasks:
+    - name: Verify existing ASF deployment
+      ansible.builtin.import_role:
+        name: asf
+
+    - name: Adopt Compose definition
+      ansible.builtin.import_role:
+        name: asf
+        tasks_from: compose
+

@@ -7,10 +7,10 @@ vps_distribution_major_version: "13"
 vps_user: salad
 
 # Infrastructure paths
-vps_home: /home/salad
-vps_infra_dir: /home/salad/infra
-vps_caddy_dir: /home/salad/infra/docker/caddy
-vps_asf_dir: /home/salad/ASF
+vps_home: "{{ ansible_facts['getent_passwd'][vps_user][4] }}"
+vps_infra_dir: "{{ vps_home }}/infra"
+vps_caddy_dir: "{{ vps_infra_dir }}/docker/caddy"
+vps_asf_dir: "{{ vps_home }}/ASF"
 vps_web_root: /srv/www
 
 # Docker
@@ -64,4 +64,29 @@ caddy_config_destination: "{{ caddy_project_dir }}/config"
 
 # Existing remote environment file
 caddy_env_file: "{{ caddy_project_dir }}/.env"
+
+# ASF
+asf_container_name: asf
+
+# ASF runtime identity
+# Empty means Docker uses the image's default user.
+asf_expected_docker_user: ""
+
+# Docker Compose project directory
+asf_project_dir: "{{ vps_infra_dir }}/docker/asf"
+
+# Persistent application data
+asf_data_dir: "{{ vps_asf_dir }}"
+asf_config_dir: "{{ asf_data_dir }}/config"
+asf_logs_dir: "{{ asf_data_dir }}/logs"
+
+# Git-managed Compose file
+asf_compose_source: >-
+  {{ playbook_dir }}/../../docker/asf/compose.yml
+
+# Deployed Compose file
+asf_compose_destination: "{{ asf_project_dir }}/compose.yml"
+
+# Management disabled during adoption
+asf_manage_compose: false
 
