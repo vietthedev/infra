@@ -18,14 +18,10 @@ services:
       - /srv/www/nana:/srv/www/nana:ro
       - caddy_data:/data
       - caddy_config:/config
-    secrets:
-      - cloudflare_api_token
+    environment:
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN is required}
     networks:
       - proxy
-
-secrets:
-  cloudflare_api_token:
-    file: ./secrets/cloudflare_api_token
 
 volumes:
   caddy_data:
