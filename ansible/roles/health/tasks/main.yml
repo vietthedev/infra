@@ -1,0 +1,110 @@
+---
+- name: Check systemd services
+  become: true
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - "{{ item }}"
+  loop: "{{ health_services }}"
+  register: health_service_results
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Verify systemd services
+  ansible.builtin.assert:
+    that:
+      - item.stdout == 'active'
+    fail_msg: "Service {{ item.item }} is not active"
+  loop: "{{ health_service_results.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Inspect Docker containers
+  become: true
+  community.docker.docker_container_info:
+    name: "{{ item }}"
+  loop: "{{ health_containers }}"
+  register: health_container_results
+
+- name: Verify Docker containers
+  ansible.builtin.assert:
+    that:
+      - item.exists
+      - item.container.State.Running | default(false)
+    fail_msg: "Container {{ item.item }} is not running"
+  loop: "{{ health_container_results.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Check UFW status
+  become: true
+  ansible.builtin.command:
+    argv:
+      - ufw
+      - status
+  register: health_ufw
+  changed_when: false
+  check_mode: false
+
+- name: Verify firewall is active
+  ansible.builtin.assert:
+    that:
+      - "'Status: active' in health_ufw.stdout"
+    fail_msg: "UFW is not active"
+
+- name: Check public HTTPS endpoints
+  become: false
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "{{ item }}"
+    method: GET
+    status_code: 200
+    timeout: 15
+    return_content: false
+  loop: "{{ health_endpoints }}"
+  register: health_http_results
+  changed_when: false
+  check_mode: false
+
+- name: Check local backup timer
+  become: true
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - "{{ health_backup_timer }}"
+  register: health_timer
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Verify local backup timer
+  ansible.builtin.assert:
+    that:
+      - health_timer.stdout == 'active'
+    fail_msg: "Local backup timer is not active"
+
+- name: Check available disk space
+  ansible.builtin.command:
+    argv:
+      - df
+      - -Pm
+      - /
+  register: health_disk
+  changed_when: false
+  check_mode: false
+
+- name: Verify available disk space
+  ansible.builtin.assert:
+    that:
+      - >-
+        (health_disk.stdout_lines[1].split()[3] | int)
+        >= (health_min_free_mb | int)
+    fail_msg: "Insufficient free disk space"
+
+- name: Report successful health checks
+  ansible.builtin.debug:
+    msg: "All VPS health checks passed"
+

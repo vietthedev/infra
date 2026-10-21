@@ -165,3 +165,20 @@ web_directory_metadata:
     owner: root
     group: root
     mode: "0755"
+
+# Health monitoring
+health_services:
+  - ssh
+  - docker
+
+health_containers:
+  - caddy
+  - asf
+
+health_endpoints:
+  - https://manabie.vietthe.dev/
+  - https://nana.vietthe.dev/
+
+health_backup_timer: vps-backup.timer
+health_min_free_mb: 512
+
