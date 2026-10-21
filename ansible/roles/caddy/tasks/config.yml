@@ -1,0 +1,198 @@
+---
+- name: Verify remote environment file
+  ansible.builtin.stat:
+    path: "{{ caddy_env_file }}"
+  register: caddy_env
+
+- name: Require existing environment file
+  ansible.builtin.assert:
+    that:
+      - caddy_env.stat.isreg | default(false)
+    fail_msg: "Caddy environment file is missing"
+
+- name: Inspect running Caddy image
+  become: true
+  ansible.builtin.command:
+    argv:
+      - docker
+      - inspect
+      - caddy
+  register: caddy_container_inspect
+  changed_when: false
+  check_mode: false
+  no_log: true
+
+- name: Record running image ID
+  ansible.builtin.set_fact:
+    caddy_image_id: >-
+      {{ (caddy_container_inspect.stdout | from_json)[0].Image }}
+  no_log: true
+
+- name: Stage and deploy Caddy configuration
+  block:
+    - name: Create staging directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: caddy-stage-
+      register: caddy_stage
+      check_mode: false
+
+    - name: Create staged config directory
+      ansible.builtin.file:
+        path: "{{ caddy_stage.path }}/config"
+        state: directory
+        mode: "0700"
+      check_mode: false
+
+    - name: Stage Git-managed configuration
+      ansible.builtin.copy:
+        src: "{{ caddy_config_source }}/"
+        dest: "{{ caddy_stage.path }}/config/"
+        mode: preserve
+      check_mode: false
+
+    - name: Validate staged config with existing Caddy image
+      become: true
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - --env-file
+          - "{{ caddy_env_file }}"
+          - --mount
+          - "type=bind,src={{ caddy_stage.path }}/config,dst=/etc/caddy,readonly"
+          - --entrypoint
+          - caddy
+          - "{{ caddy_image_id }}"
+          - validate
+          - --config
+          - /etc/caddy/Caddyfile
+          - --adapter
+          - caddyfile
+      changed_when: false
+      check_mode: false
+      no_log: true
+
+    - name: Preview configuration differences
+      become: true
+      ansible.builtin.command:
+        argv:
+          - rsync
+          - -ani
+          - --delete
+          - "{{ caddy_stage.path }}/config/"
+          - "{{ caddy_config_destination }}/"
+      register: caddy_preview
+      changed_when: false
+      check_mode: false
+
+    - name: Show proposed changes
+      ansible.builtin.debug:
+        var: caddy_preview.stdout_lines
+
+    - name: Apply approved configuration
+      when:
+        - caddy_manage_config | bool
+        - not ansible_check_mode
+        - caddy_preview.stdout | length > 0
+      block:
+        - name: Create rollback directory
+          become: true
+          ansible.builtin.tempfile:
+            state: directory
+            path: "{{ caddy_project_dir }}"
+            prefix: .config-backup-
+          register: caddy_backup
+
+        - name: Back up deployed configuration
+          become: true
+          ansible.builtin.command:
+            argv:
+              - cp
+              - -a
+              - "{{ caddy_config_destination }}"
+              - "{{ caddy_backup.path }}/config"
+          changed_when: true
+
+        - name: Mark backup complete
+          ansible.builtin.set_fact:
+            caddy_backup_ready: true
+
+        - name: Synchronize validated configuration
+          become: true
+          ansible.builtin.command:
+            argv:
+              - rsync
+              - -a
+              - --delete
+              - "{{ caddy_stage.path }}/config/"
+              - "{{ caddy_config_destination }}/"
+          changed_when: true
+
+        - name: Validate deployed configuration
+          become: true
+          ansible.builtin.command:
+            argv:
+              - docker
+              - exec
+              - "{{ caddy_container_name }}"
+              - caddy
+              - validate
+              - --config
+              - /etc/caddy/Caddyfile
+          changed_when: false
+          no_log: true
+
+        - name: Gracefully reload Caddy
+          become: true
+          ansible.builtin.command:
+            argv:
+              - docker
+              - exec
+              - "{{ caddy_container_name }}"
+              - caddy
+              - reload
+              - --config
+              - /etc/caddy/Caddyfile
+          changed_when: true
+          no_log: true
+
+      rescue:
+        - name: Restore previous configuration
+          become: true
+          ansible.builtin.command:
+            argv:
+              - rsync
+              - -a
+              - --delete
+              - "{{ caddy_backup.path }}/config/"
+              - "{{ caddy_config_destination }}/"
+          when: caddy_backup_ready | default(false)
+
+        - name: Reload restored configuration
+          become: true
+          ansible.builtin.command:
+            argv:
+              - docker
+              - exec
+              - "{{ caddy_container_name }}"
+              - caddy
+              - reload
+              - --config
+              - /etc/caddy/Caddyfile
+          when: caddy_backup_ready | default(false)
+          no_log: true
+
+        - name: Fail deployment
+          ansible.builtin.fail:
+            msg: "Caddy deployment failed; check whether rollback succeeded"
+
+  always:
+    - name: Clean staging directory
+      ansible.builtin.file:
+        path: "{{ caddy_stage.path }}"
+        state: absent
+      when: caddy_stage.path is defined
+      check_mode: false
+

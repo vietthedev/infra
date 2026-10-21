@@ -1,0 +1,77 @@
+---
+- name: Verify Caddy project directory
+  ansible.builtin.stat:
+    path: "{{ caddy_project_dir }}"
+  register: caddy_project
+
+- name: Assert Caddy project exists
+  ansible.builtin.assert:
+    that:
+      - caddy_project.stat.isdir | default(false)
+    fail_msg: "Caddy project directory is missing"
+
+- name: Inspect Caddy container
+  become: true
+  ansible.builtin.command:
+    argv:
+      - docker
+      - inspect
+      - "{{ caddy_container_name }}"
+  register: caddy_inspect
+  changed_when: false
+  check_mode: false
+  no_log: true
+
+- name: Parse Caddy container information
+  ansible.builtin.set_fact:
+    caddy_info: "{{ (caddy_inspect.stdout | from_json)[0] }}"
+  no_log: true
+
+- name: Verify Caddy is running
+  ansible.builtin.assert:
+    that:
+      - caddy_info.State.Running | bool
+    fail_msg: "Caddy container is not running"
+
+- name: Verify Docker Compose ownership
+  ansible.builtin.assert:
+    that:
+      - "'com.docker.compose.project' in caddy_info.Config.Labels"
+      - "'com.docker.compose.service' in caddy_info.Config.Labels"
+      - "caddy_info.Config.Labels['com.docker.compose.service'] == 'caddy'"
+    fail_msg: "Caddy is not managed by the expected Compose service"
+
+- name: Verify Caddy network
+  ansible.builtin.assert:
+    that:
+      - docker_network_name in caddy_info.NetworkSettings.Networks
+    fail_msg: "Caddy is not connected to the proxy network"
+
+- name: Validate running Caddy configuration
+  become: true
+  ansible.builtin.command:
+    argv:
+      - docker
+      - exec
+      - "{{ caddy_container_name }}"
+      - caddy
+      - validate
+      - --config
+      - "{{ caddy_config_path }}"
+      - --adapter
+      - caddyfile
+  register: caddy_validation
+  changed_when: false
+  check_mode: false
+
+- name: Show deployment information
+  ansible.builtin.debug:
+    msg:
+      container: "{{ caddy_container_name }}"
+      running: "{{ caddy_info.State.Running }}"
+      image: "{{ caddy_info.Config.Image }}"
+      compose_project: "{{ caddy_info.Config.Labels['com.docker.compose.project'] }}"
+      compose_working_dir: "{{ caddy_info.Config.Labels.get('com.docker.compose.project.working_dir', 'unknown') }}"
+      proxy_network: "{{ docker_network_name }}"
+      configuration_valid: true
+

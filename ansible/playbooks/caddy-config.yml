@@ -1,0 +1,15 @@
+---
+- name: Deploy Caddy configuration
+  hosts: vps
+  gather_facts: true
+
+  tasks:
+    - name: Verify existing Caddy deployment
+      ansible.builtin.import_role:
+        name: caddy
+
+    - name: Stage, validate and manage configuration
+      ansible.builtin.import_role:
+        name: caddy
+        tasks_from: config
+

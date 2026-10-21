@@ -1,0 +1,50 @@
+---
+- name: Verify existing Compose working directory
+  ansible.builtin.assert:
+    that:
+      - >-
+        caddy_info.Config.Labels[
+          'com.docker.compose.project.working_dir'
+        ] == caddy_project_dir
+    fail_msg: "Compose working directory does not match"
+
+- name: Record existing Compose project identity
+  ansible.builtin.set_fact:
+    caddy_existing_project: >-
+      {{ caddy_info.Config.Labels['com.docker.compose.project'] }}
+
+- name: Preview Compose file differences
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../docker/caddy/compose.yaml"
+    dest: "{{ caddy_project_dir }}/compose.yaml"
+    mode: "0644"
+  check_mode: true
+  diff: true
+  register: caddy_compose_preview
+
+- name: Deploy approved Compose file
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../docker/caddy/compose.yaml"
+    dest: "{{ caddy_project_dir }}/compose.yaml"
+    mode: "0644"
+    backup: true
+  when:
+    - caddy_manage_compose | bool
+    - not ansible_check_mode
+
+- name: Reconcile existing Compose project without recreation
+  become: true
+  community.docker.docker_compose_v2:
+    project_src: "{{ caddy_project_dir }}"
+    project_name: "{{ caddy_existing_project }}"
+    state: present
+    recreate: never
+    build: never
+    pull: never
+    remove_orphans: false
+    renew_anon_volumes: false
+  when:
+    - caddy_manage_compose | bool
+    - not ansible_check_mode
+  no_log: true
+

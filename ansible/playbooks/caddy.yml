@@ -1,0 +1,8 @@
+---
+- name: Manage Caddy reverse proxy
+  hosts: vps
+  gather_facts: true
+
+  roles:
+    - caddy
+

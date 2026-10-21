@@ -1,0 +1,15 @@
+---
+- name: Manage Caddy Compose project
+  hosts: vps
+  gather_facts: true
+
+  tasks:
+    - name: Verify existing Caddy deployment
+      ansible.builtin.import_role:
+        name: caddy
+
+    - name: Adopt Compose configuration
+      ansible.builtin.import_role:
+        name: caddy
+        tasks_from: compose
+

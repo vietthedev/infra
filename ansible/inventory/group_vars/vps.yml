@@ -9,7 +9,7 @@ vps_user: salad
 # Infrastructure paths
 vps_home: /home/salad
 vps_infra_dir: /home/salad/infra
-vps_caddy_dir: /home/salad/infra/caddy
+vps_caddy_dir: /home/salad/infra/docker/caddy
 vps_asf_dir: /home/salad/ASF
 vps_web_root: /srv/www
 
@@ -40,4 +40,28 @@ ssh_manage_config: true
 
 ssh_config_path: /etc/ssh/sshd_config.d/10-hardening.conf
 ssh_service_name: ssh
+
+# Caddy
+caddy_container_name: caddy
+caddy_project_dir: "{{ vps_caddy_dir }}"
+caddy_config_path: /etc/caddy/Caddyfile
+
+caddy_expected_domains:
+  - asf.vietthe.dev
+  - manabie.vietthe.dev
+  - nana.vietthe.dev
+
+# Deployment management
+caddy_manage_config: false
+caddy_manage_compose: false
+
+# Local Git-managed configuration
+caddy_config_source: >-
+  {{ playbook_dir }}/../../docker/caddy/config
+
+# Existing remote configuration
+caddy_config_destination: "{{ caddy_project_dir }}/config"
+
+# Existing remote environment file
+caddy_env_file: "{{ caddy_project_dir }}/.env"
 
